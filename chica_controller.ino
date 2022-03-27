@@ -1,4 +1,5 @@
 #include <Arduino.h>
+int group1Cycles = 0;
 
 class LED {
 private:
@@ -13,7 +14,8 @@ private:
     int pauseCycles = 0;
     int bright = 100;
     String name = "unset";
-    int cycleCount = 0;
+    //int cycleCount = 0;
+    int* groupCycles;
 public:
 
     struct LEDConfig {
@@ -27,7 +29,8 @@ public:
         int toggle = 0;
     };
 
-    explicit LED(LED::LEDConfig config) {
+
+    explicit LED(LED::LEDConfig config, int* gCycles): groupCycles(gCycles) {
         LEDPin = config.pin;
         newState = config.initialState;
         wantChange = true;
@@ -47,8 +50,10 @@ public:
         result += name;
         result += " started. PIN: ";
         result += LEDPin;
-        result += ". Group Pointer: ";
-        result += cycleCount;
+        if (groupCycles != nullptr) {
+            result += ". Group Pointer: ";
+            result += *groupCycles;
+        }
         return result;
     }
 
@@ -71,10 +76,12 @@ public:
 
     String Refresh() {
         String result = "[" + name + "] ";
-        if (pauseCycles > 0 && cycleCount > pauseCycles && state) {
-            result += "Pausing due to cycle count" + cycleCount;
-            cycleCount = 0;
-            Toggle(1000);
+        if (groupCycles != nullptr) {
+            if (pauseCycles > 0 && *groupCycles > pauseCycles && state) {
+                result += "Pausing due to cycle count" + *groupCycles;
+                *groupCycles = 0;
+                Toggle(1000);
+            }
         } else {
             if (toggleDuration > 0) {
                 Toggle(toggleDuration);
@@ -89,7 +96,10 @@ public:
             state = newState;
             wantChange = false;
             WritePin();
-            cycleCount++;
+            if (groupCycles != nullptr) {
+                *groupCycles++;
+            }
+
             return result;
         }
         return "";
@@ -105,7 +115,7 @@ LED ledArray[] = {
                 onRandom:3,
                 offRandom:300,
                 cyclesLimit:10
-        }),
+        }, &group1Cycles),
 
         LED(LED::LEDConfig{
                 pin:9,
@@ -115,13 +125,13 @@ LED ledArray[] = {
                 onRandom:5,
                 offRandom:250,
                 cyclesLimit:10
-        }),
+        }, &group1Cycles),
 
         LED(LED::LEDConfig{
                 pin:10,
                 LEDName:"Leg, Red",
                 initialState:true,
-                brightValue:10}),
+                brightValue:10}, nullptr),
 
         LED(LED::LEDConfig{
                     pin:13,
@@ -132,7 +142,7 @@ LED ledArray[] = {
                     .offRandom = 0,
                     .cyclesLimit = 0,
                     .toggle = 500
-            }
+            }, nullptr
         )
 };
 
