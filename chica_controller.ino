@@ -31,6 +31,7 @@ public:
 
 
     explicit LED(LED::LEDConfig config, int* gCycles): groupCycles(gCycles) {
+        groupCycles = gCycles;
         LEDPin = config.pin;
         newState = config.initialState;
         wantChange = true;
@@ -51,8 +52,10 @@ public:
         result += " started. PIN: ";
         result += LEDPin;
         if (groupCycles != nullptr) {
-            result += ". Group Pointer: ";
+            result += ". Group Value: ";
             result += *groupCycles;
+            result += ", Group Address: ";
+            result += (long)&groupCycles;
         }
         return result;
     }
@@ -82,16 +85,16 @@ public:
                 *groupCycles = 0;
                 Toggle(1000);
             }
-        } else {
-            if (toggleDuration > 0) {
-                Toggle(toggleDuration);
-                result += "Toggle State";
-            }
-            if (onRandomDuration > 0 && offRandomDuration > 0) {
-                Toggle(random(state ? offRandomDuration : onRandomDuration));
-                result += "Random State to " + newState ? "on" : "off";
-            }
         }
+        if (toggleDuration > 0) {
+            Toggle(toggleDuration);
+            result += "Toggle State";
+        }
+        if (onRandomDuration > 0 && offRandomDuration > 0) {
+            Toggle(random(state ? offRandomDuration : onRandomDuration));
+            result += "Random State to " + newState ? "on" : "off";
+        }
+
         if (newState != state && timeToChange >= millis() && wantChange) {
             state = newState;
             wantChange = false;
@@ -148,17 +151,21 @@ LED ledArray[] = {
 
 void setup() {
     Serial.begin(57600);
+
     Serial.print("Starting. LED Array: ");
     Serial.println(sizeof ledArray / sizeof ledArray[0]);
+    Serial.print("Group1 Address: ");
+    Serial.println((long)&group1Cycles);
     for (auto &i: ledArray) { Serial.println(i.Report()); }
 }
 
 
 void loop() {
-    for (auto &i: ledArray) {
+    /*for (auto &i: ledArray) {
         String a = i.Refresh();
         if (a != "") {
             Serial.println(a);
         }
     }
+     */
 }
