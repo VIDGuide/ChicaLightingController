@@ -1,4 +1,6 @@
 #include <Arduino.h>
+int group1Cycles = 0;
+long randomDelay = 1000;
 
 class LED {
 private:
@@ -13,7 +15,8 @@ private:
     int pauseCycles = 0;
     int bright = 100;
     String name = "unset";
-    int cycleCount = 0;
+    int* groupCycles;
+    bool resetGroupCounter = false;
 public:
 
     struct LEDConfig {
@@ -27,7 +30,8 @@ public:
         int toggle = 0;
     };
 
-    explicit LED(LED::LEDConfig config) {
+
+    explicit LED(LED::LEDConfig config, int* gCycles): groupCycles(gCycles) {
         LEDPin = config.pin;
         newState = config.initialState;
         wantChange = true;
@@ -47,13 +51,17 @@ public:
         result += name;
         result += " started. PIN: ";
         result += LEDPin;
-        result += ". Group Pointer: ";
-        result += cycleCount;
+        if (groupCycles != nullptr) {
+            result += ". Group Value: ";
+            result += *groupCycles;
+            result += ", Group Address: ";
+            result += (long)&groupCycles;
+        }
         return result;
     }
 
-    void Toggle(long delayInMS) {
-        if (timeToChange > millis()) {
+    void Toggle(long delayInMS, bool forceState = false) {
+        if (timeToChange > millis() && !forceState) {
             return;
         }
         wantChange = true;
@@ -69,30 +77,34 @@ public:
         }
     }
 
-    String Refresh() {
-        String result = "[" + name + "] ";
-        if (pauseCycles > 0 && cycleCount > pauseCycles && state) {
-            result += "Pausing due to cycle count" + cycleCount;
-            cycleCount = 0;
-            Toggle(1000);
-        } else {
-            if (toggleDuration > 0) {
-                Toggle(toggleDuration);
-                result += "Toggle State";
-            }
-            if (onRandomDuration > 0 && offRandomDuration > 0) {
-                Toggle(random(state ? offRandomDuration : onRandomDuration));
-                result += "Random State to " + newState ? "on" : "off";
+    void Refresh() {
+        if (groupCycles != nullptr) {
+            if (pauseCycles > 0 && *groupCycles > pauseCycles && state) {
+                Toggle(randomDelay, true);
+                resetGroupCounter = true;
             }
         }
+        if (toggleDuration > 0) {
+            Toggle(toggleDuration);
+        }
+        if (onRandomDuration > 0 && offRandomDuration > 0) {
+            Toggle(random(state ? offRandomDuration : onRandomDuration));
+        }
+
         if (newState != state && timeToChange >= millis() && wantChange) {
             state = newState;
             wantChange = false;
             WritePin();
-            cycleCount++;
-            return result;
+            if (groupCycles != nullptr) {
+                if (resetGroupCounter) {
+                    resetGroupCounter = false;
+                    *groupCycles = 0;
+                    randomDelay = random(1000);
+                } else {
+                    (*groupCycles)++;
+                }
+            }
         }
-        return "";
     }
 };
 
@@ -104,8 +116,8 @@ LED ledArray[] = {
                 .brightValue = 255,
                 onRandom:3,
                 offRandom:300,
-                cyclesLimit:10
-        }),
+                cyclesLimit:20
+        }, &group1Cycles),
 
         LED(LED::LEDConfig{
                 pin:9,
@@ -114,14 +126,14 @@ LED ledArray[] = {
                 .brightValue = 255,
                 onRandom:5,
                 offRandom:250,
-                cyclesLimit:10
-        }),
+                cyclesLimit:20
+        }, &group1Cycles),
 
         LED(LED::LEDConfig{
                 pin:10,
                 LEDName:"Leg, Red",
                 initialState:true,
-                brightValue:10}),
+                brightValue:10}, nullptr),
 
         LED(LED::LEDConfig{
                     pin:13,
@@ -132,23 +144,24 @@ LED ledArray[] = {
                     .offRandom = 0,
                     .cyclesLimit = 0,
                     .toggle = 500
-            }
+            }, nullptr
         )
 };
 
 void setup() {
     Serial.begin(57600);
+
     Serial.print("Starting. LED Array: ");
     Serial.println(sizeof ledArray / sizeof ledArray[0]);
+    Serial.print("Group1 Address: ");
+    Serial.println((long)&group1Cycles);
     for (auto &i: ledArray) { Serial.println(i.Report()); }
+    Serial.end();
 }
 
 
 void loop() {
     for (auto &i: ledArray) {
-        String a = i.Refresh();
-        if (a != "") {
-            Serial.println(a);
-        }
+        i.Refresh();
     }
 }
